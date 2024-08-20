@@ -4,8 +4,6 @@ import torch
 from torch import nn
 import math
 
-print(torch.__version__)
-print(torch.cuda.is_available())
 
 # Positional Embedding位置嵌入层
 class GPT1_Embedding_Layer(nn.Module):
@@ -14,7 +12,7 @@ class GPT1_Embedding_Layer(nn.Module):
     # 模型能处理最大序列长度暂不定义
     # dropout_rate：dorpout层比率默认为0.1
     def __init__(self, vocab_size, embedding_dim, device):
-        super(GPT1_Embedding_Layer, self).__init__(vocab_size, embedding_dim)
+        super(GPT1_Embedding_Layer, self).__init__()
         self.vocab_size = vocab_size
         self.embedding_dim = embedding_dim
         self.device = device
@@ -53,7 +51,7 @@ class GPT1_Embedding_Layer(nn.Module):
 # Scaled Dot-Product Attention点积缩放注意力
 class Scaled_Dot_Product_Attention(nn.Module):
     def __init__(self, device):
-        super(Scaled_Dot_Product_Attention, self).__init__(device)
+        super(Scaled_Dot_Product_Attention, self).__init__()
         self.device = device
         # 使用softmax函数，dim = -1意味着softmax函数作用到随后一个维度上
         self.softmax = nn.Softmax(dim = -1)
@@ -83,7 +81,7 @@ class Scaled_Dot_Product_Attention(nn.Module):
 # reshape函数改变张量形状，得到第二维度num_heads之后恢复形状，实现多头注意力
 class Multi_Head_Attn(nn.Module):
     def __init__(self, num_heads, d_model, batch_size, device):
-        super(Multi_Head_Attn, self).__init__(num_heads, d_model, batch_size, device)
+        super(Multi_Head_Attn, self).__init__()
         self.d_k = self.d_v = self.d_q = 64
         self.num_heads = num_heads
         self.batch_size = batch_size
@@ -167,7 +165,7 @@ class Decoder(nn.Module):
     
 class PoemModel(nn.Module):
     def __init__(self, vocab_size, num_heads, d_model, batch_size, device, num_layers):
-        super(PoemModel).__init__()
+        super(PoemModel, self).__init__()
         self.Positional_embedding = GPT1_Embedding_Layer(vocab_size, d_model, device)
         self.Decoder = Decoder(num_heads, d_model, batch_size, device, num_layers)
         self.linear = nn.Linear(d_model, vocab_size)
