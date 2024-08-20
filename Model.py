@@ -20,6 +20,8 @@ class GPT1_Embedding_Layer(nn.Module):
         self.device = device
         # 定义嵌入层，将tokens索引映射到多维嵌入向量
         # nn.Embedding()接受两个参数：词汇表大小和嵌入向量的维度
+        # 输出：(batch_size, sequence_length, embedding_dim)
+        # 后文中d_model == embedding_dim
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
 
     # 输入矩阵x形状为(batch_size, seq_len)
@@ -65,6 +67,7 @@ class Scaled_Dot_Product_Attention(nn.Module):
     def forward(self, Q, K, V):
         # transpose:转置K的第二维度和最后维度
         # K.size(-1)的最后维度为d_k
+        # Q,K,V 形状(batch_size, num_heads, len_s, d)
         attention_scores = torch.matmul(Q, K.transpose(2, -1)) / math.aqrt(K.size(-1))
         sub_mask = self.mask(attention_scores.size(0), attention_scores.size(1), attention_scores.size(2))
         # 将sub_mask矩阵值为True的单位转换成-1e7
@@ -74,7 +77,10 @@ class Scaled_Dot_Product_Attention(nn.Module):
         # score形状(batch_size, num_heads, seq_len, d_v)
         score = torch.matmul(attention_scores, V)
         return score
-        
+
+# 多头注意力
+# 将x进行不同权重的线性变换得到Q，K，V
+# reshape函数改变张量形状，得到第二维度num_heads之后恢复形状，实现多头注意力
 class Multi_Head_Attn(nn.Module):
     def __init__(self, num_heads, d_model, batch_size, device):
         super(Multi_Head_Attn, self).__init__(num_heads, d_model, batch_size, device)
@@ -83,11 +89,94 @@ class Multi_Head_Attn(nn.Module):
         self.batch_size = batch_size
         self.d_model = d_model
         self.device = device
-        # nn.Linear函数功能：将输入特征变换为输出特征
-        self.w_Qs = nn.Linear(d_model, num_heads * self.d_k, bias=False)
-        self.w_Ks = nn.Linear(d_model, num_heads * self.d_k, bias=False)
-        self.w_Vs = nn.Linear(d_model, num_heads * self.d_v, bias=False)
+        # nn.Linear函数功能：将输入特征（变量1）变换为输出特征（变量2），输出权重矩阵
+        self.w_Qs = nn.Linear(d_model, num_heads * self.d_q, bias=False) # queries
+        self.w_Ks = nn.Linear(d_model, num_heads * self.d_k, bias=False) # keys
+        self.w_Vs = nn.Linear(d_model, num_heads * self.d_v, bias=False) # values
         self.w_Os = nn.Linear(num_heads * self.d_v, d_model, bias=False)
+        # 使用残差连接，帮助模型学习复杂特征的同时保留原始输入信息，可以避免信息丢失
         self.layerNorm = nn.LayerNorm(d_model)
 
+    # forward接受矩阵x形状：(batch_size, sequence_length, d_model)
     def forward(self, x):
+        residual = x # 残差连接
+        Q = self.w_Qs(x)
+        K = self.w_Ks(x)
+        V = self.w_Vs(x)
+        # Q, K, V的形状为(batch_size, sequence_length, num_heads * d_k)
+
+        Q = torch.reshape(Q, (self.batch_size, -1, self.num_heads, 64)).transpose(1, 2)
+        K = torch.reshape(K, (self.batch_size, -1, self.num_heads, 64)).transpose(1, 2)
+        V = torch.reshape(V, (self.batch_size, -1, self.num_heads, 64)).transpose(1, 2)
+        # Q,K,V 形状(batch_size, num_heads, sequence_length, d_k)
+
+        SDP_attn = Scaled_Dot_Product_Attention(self.device)
+        # score转置前形状(batch_size, num_heads, seq_len, d_v)
+        attn_score = SDP_attn(Q, K, V).transpose(1, 2)
+        # score转置后形状(batch_size, seq_len, num_heads, d_v)
+        attn_score = self.w_Os(torch.reshape(attn_score, (-1, -1, self.num_heads * self.d_v)))
+        # 形状(batch_size, seq_len, num_heads * d)
+        # d_model = num_heads * d_v
+        attn_score = self.w_Os(attn_score)
+        # 形状(batch_size, seq_len, d_model)
+        attn_score = self.layerNorm(attn_score + residual)
+        return attn_score
+    
+# 前馈神经网络层
+class FeedForwardNet(nn.Module):
+    def __init__(self, d_model):
+        super(FeedForwardNet, self).__init__()
+        self.d_ffn = 2048 #隐藏层维度
+        self.d_model = d_model
+        self.ff = nn.Sequential(
+            # 对x进行扩展，使其拥有更加复杂和丰富的特征
+            nn.Linear(d_model, self.d_ffn, bias=False),
+            # 引用ReLU函数，引入非线性变换，模型可以捕捉和建模输入数据中的非线性关系
+            nn.ReLU(),
+            # 信息聚合并保证矩阵形状不变
+            nn.Linear(self.d_ffn, d_model, bias=False)
+        )
+        self.layernorm = nn.LayerNorm(d_model)
+
+    def forward(self, x):
+        residual = x
+        x = self.ff(x)
+        x = self.layernorm(x + residual)
+        return x
+    
+class Decoder_layer(nn.Module):
+    def __init__(self, num_heads, d_model, batch_size, device):
+        super(Decoder_layer, self).__init__()
+        self.MH_attn = Multi_Head_Attn(num_heads, d_model, batch_size, device)
+        self.FF_net = FeedForwardNet(d_model)
+
+    def forward(self, x):
+        x = self.MH_attn.forward(x)
+        x = self.FF_net.forward(x)
+        return x
+    
+class Decoder(nn.Module):
+    def __init__(self, num_heads, d_model, batch_size, device, num_layers):
+        super(Decoder, self).__init__()
+        self.decoder_layers = nn.ModuleList([Decoder_layer(num_heads, d_model, batch_size, device) for _ in range(num_layers)])
+
+    def forward(self, x):
+        for layer in self.decoder_layers:
+            x = layer.forward(x)
+        return x
+    
+class PoemModel(nn.Module):
+    def __init__(self, vocab_size, num_heads, d_model, batch_size, device, num_layers):
+        super(PoemModel).__init__()
+        self.Positional_embedding = GPT1_Embedding_Layer(vocab_size, d_model, device)
+        self.Decoder = Decoder(num_heads, d_model, batch_size, device, num_layers)
+        self.linear = nn.Linear(d_model, vocab_size)
+
+    def forward(self, x):
+        #x形状：(batch_size, seq_len)
+        x = self.Positional_embedding.forward(x)
+        #x形状：(batch_size, len_s, d_model)
+        x = self.Decoder.forward(x)
+        #x形状：(batch_size, len_s, vocab_size)
+        x = self.linear(x)
+        return x

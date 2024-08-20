@@ -12,7 +12,11 @@ X = torch.Tensor([
         [0.7,0.8,0.9,0.9,0.9],
         ])
 print(X)
-model = nn.Linear(5, 10, bias=False)
-print(model(X))
+model_1 = nn.Linear(5, 10 * 3, bias=False)
+model_2 = nn.Linear(5, 10 * 3, bias=False)
+
+print(model_1(X))
+print(model_2(X))
+
 
 
