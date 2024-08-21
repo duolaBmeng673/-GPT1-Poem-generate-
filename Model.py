@@ -66,12 +66,12 @@ class Scaled_Dot_Product_Attention(nn.Module):
         # transpose:转置K的第二维度和最后维度
         # K.size(-1)的最后维度为d_k
         # Q,K,V 形状(batch_size, num_heads, len_s, d)
-        attention_scores = torch.matmul(Q, K.transpose(2, -1)) / math.aqrt(K.size(-1))
+        attention_scores = torch.matmul(Q, K.transpose(2, -1)) / math.sqrt(K.size(-1))
         sub_mask = self.mask(attention_scores.size(0), attention_scores.size(1), attention_scores.size(2))
         # 将sub_mask矩阵值为True的单位转换成-1e7
         attention_scores.masked_fill_(sub_mask, -1e7)
         # 计算softmax
-        attention_scores = self.sf(attention_scores)
+        attention_scores = self.softmax(attention_scores)
         # score形状(batch_size, num_heads, seq_len, d_v)
         score = torch.matmul(attention_scores, V)
         return score
@@ -97,22 +97,23 @@ class Multi_Head_Attn(nn.Module):
 
     # forward接受矩阵x形状：(batch_size, sequence_length, d_model)
     def forward(self, x):
+        batch_size = x.size(0)
         residual = x # 残差连接
         Q = self.w_Qs(x)
         K = self.w_Ks(x)
         V = self.w_Vs(x)
         # Q, K, V的形状为(batch_size, sequence_length, num_heads * d_k)
 
-        Q = torch.reshape(Q, (self.batch_size, -1, self.num_heads, 64)).transpose(1, 2)
-        K = torch.reshape(K, (self.batch_size, -1, self.num_heads, 64)).transpose(1, 2)
-        V = torch.reshape(V, (self.batch_size, -1, self.num_heads, 64)).transpose(1, 2)
+        Q = torch.reshape(Q, (batch_size, -1, self.num_heads, 64)).transpose(1, 2)
+        K = torch.reshape(K, (batch_size, -1, self.num_heads, 64)).transpose(1, 2)
+        V = torch.reshape(V, (batch_size, -1, self.num_heads, 64)).transpose(1, 2)
         # Q,K,V 形状(batch_size, num_heads, sequence_length, d_k)
 
         SDP_attn = Scaled_Dot_Product_Attention(self.device)
         # score转置前形状(batch_size, num_heads, seq_len, d_v)
         attn_score = SDP_attn(Q, K, V).transpose(1, 2)
         # score转置后形状(batch_size, seq_len, num_heads, d_v)
-        attn_score = self.w_Os(torch.reshape(attn_score, (-1, -1, self.num_heads * self.d_v)))
+        attn_score = torch.reshape(attn_score, (batch_size, -1, self.num_heads * self.d_v))
         # 形状(batch_size, seq_len, num_heads * d)
         # d_model = num_heads * d_v
         attn_score = self.w_Os(attn_score)

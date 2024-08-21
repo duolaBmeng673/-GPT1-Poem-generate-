@@ -32,3 +32,39 @@ if __name__ == '__main__':
 
     train_data = MyDataset(data, word2id, id2word)
     train_data = DataLoader(train_data, batch_size, shuffle=True, drop_last=True, collate_fn=train_data.padding_batch)
+
+    for i in range(epoch):
+        print(f"第{i}轮训练开始")
+        sum_loss = 0
+        # 已处理的批数
+        cnt_data = 0
+        for batch in train_data:
+            opt.zero_grad()
+            input,target = batch
+            # input, target形状：(batch_size, max_len)
+            input = input.to(device)
+            target = target.to(device)
+            # 将输出数据展平为一维向量
+            target = target.view(-1)
+
+            # 前向传播
+            output = model.forward(input).to(device)
+            # output形状(batch_size, len_s, vocab_size)
+            # 在保证值不变的前提下对矩阵进行重构
+            output = output.view(-1, vocab_size) # ?
+
+            # 计算当前批次的损失值，返回标量张量
+            # output：模型输出  target：实际结果
+            result_loss = loss(output, target)
+            # 反向传播，计算梯度
+            result_loss.backward()
+            # 更新模型参数，应用通过反向传播计算出的梯度
+            opt.step()
+
+            sum_loss += result_loss
+            cnt_data += 1
+        # item()将单个标量张量转化为数值类型
+        print(f"第{i}轮的平均损失为{sum_loss.item()/cnt_data}")
+
+    torch.save(model.state_dict(), './model_state.pth')
+

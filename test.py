@@ -15,8 +15,11 @@ print(X)
 model_1 = nn.Linear(5, 10 * 3, bias=False)
 model_2 = nn.Linear(5, 10 * 3, bias=False)
 
+
 print(model_1(X))
 print(model_2(X))
+X_1 = X.view(-1, 3)
+print(X_1)
 
 
 
