@@ -5,8 +5,9 @@ from Model import *
 from Dataset import *
 import pandas as pd
 from torch import nn
+import time
 
-
+torch.cuda.empty_cache()
 
 if __name__ == '__main__':
     data = pd.read_json("./data_test/ccpc_train_v1.0.json", lines=True)
@@ -20,7 +21,7 @@ if __name__ == '__main__':
     num_heads = 8
     num_layers = 12
     lr = 0.0001 # 优化器学习率
-    batch_size = 32
+    batch_size = 16
 
     model = PoemModel(vocab_size, num_heads, d_model, batch_size, device, num_layers).to(device)
     # 损失函数
@@ -28,7 +29,8 @@ if __name__ == '__main__':
     loss = torch.nn.CrossEntropyLoss(ignore_index = 8).to(device)
     # 使用Adam优化器
     opt = torch.optim.Adam(model.parameters(), lr)
-    epoch =  30
+    
+    epoch =  15
 
     train_data = MyDataset(data, word2id, id2word)
     train_data = DataLoader(train_data, batch_size, shuffle=True, drop_last=True, collate_fn=train_data.padding_batch)
@@ -38,6 +40,7 @@ if __name__ == '__main__':
         sum_loss = 0
         # 已处理的批数
         cnt_data = 0
+        start_time = time.perf_counter()
         for batch in train_data:
             opt.zero_grad()
             input,target = batch
@@ -63,8 +66,11 @@ if __name__ == '__main__':
 
             sum_loss += result_loss
             cnt_data += 1
+            
+        end_time = time.perf_counter()
         # item()将单个标量张量转化为数值类型
         print(f"第{i}轮的平均损失为{sum_loss.item()/cnt_data}")
+        print(f"第{i}轮花费时间为：{end_time - start_time}")
 
     torch.save(model.state_dict(), './model_state.pth')
 
