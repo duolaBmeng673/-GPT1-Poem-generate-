@@ -179,3 +179,10 @@ class PoemModel(nn.Module):
         #x形状：(batch_size, len_s, vocab_size)
         x = self.linear(x)
         return x
+    
+def re_tokenizer(sentence, id2word):
+    str = ''
+    for i in range(sentence.size(0)):
+        if i != 0:
+            str += id2word(sentence[i].item())
+    print(str)

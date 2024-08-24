@@ -143,4 +143,15 @@ class Mytest_Dataset(Dataset):
         outputs = torch.tensor([d['target'] for d in batch],dtype=torch.long)
         return inputs, outputs, Con_max_len
     
-    
+def re_tokenizer(sentence, id2word):
+    str = ''
+    for i in range(len(sentence)):
+        if i != 0:
+            str += id2word[sentence[i].item()]
+    print(str)
+
+def re_tokenizer_1(sentence, id2word):
+    str = ''
+    for i in range(len(sentence)):    
+        str += id2word[sentence[i].item()]
+    print(str)
