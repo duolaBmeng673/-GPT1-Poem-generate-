@@ -128,7 +128,7 @@ class Mytest_Dataset(Dataset):
     
     def padding_batch(self, batch):
         Ip_lens = [d['input_len'] for d in batch]
-        Tg_lens = [d['input_len'] for d in batch]
+        Tg_lens = [d['target_len'] for d in batch]
         Con_lens = [d['len_content'] for d in batch]
 
         input_max_len = max(Ip_lens)

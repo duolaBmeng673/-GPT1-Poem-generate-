@@ -6,6 +6,9 @@ from Dataset import *
 import pandas as pd
 from torch import nn
 import time
+from tqdm import tqdm
+import time
+
 
 torch.cuda.empty_cache()
 
@@ -40,8 +43,9 @@ if __name__ == '__main__':
         sum_loss = 0
         # 已处理的批数
         cnt_data = 0
-        start_time = time.perf_counter()
-        for batch in train_data:
+        start_time = time.perf_counter()        
+        loop = tqdm(train_data, leave=True)
+        for batch in loop:
             opt.zero_grad()
             input,target = batch
             # input, target形状：(batch_size, max_len)
@@ -66,6 +70,9 @@ if __name__ == '__main__':
 
             sum_loss += result_loss
             cnt_data += 1
+
+            loop.set_description(f"Epoch [{i+1}/{epoch}]")
+            loop.set_postfix(loss=sum_loss/cnt_data)
             
         end_time = time.perf_counter()
         # item()将单个标量张量转化为数值类型

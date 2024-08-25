@@ -56,7 +56,8 @@ if __name__ == '__main__':
             # print(f"len of output_sen:{len(output_sen)}")
             # print(f"shape of output logit:{output_logit.shape}")
             # print(f"shape of target:{target.shape}")
-            target = target[ : len(output_logit)]
+            # print(output_logit)
+            # print(target)
             poem_loss = loss(output_logit, target)
             print(f"{output_sen},ppl:{torch.exp(poem_loss)}\n")
             sum_loss += poem_loss
