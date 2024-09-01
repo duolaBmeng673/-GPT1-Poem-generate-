@@ -1,0 +1,1 @@
+模仿GPT1和transformers论文，搭建诗歌生成模型
